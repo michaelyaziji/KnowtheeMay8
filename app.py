@@ -328,6 +328,80 @@ def create_pdf(profile_text, question_answer=None):
 
     return pdf.output(dest='S')
 
+def clean_source_text(source_text):
+    """Clean up temporary filenames in sources text and replace generic file types with meaningful document descriptions."""
+    if not source_text:
+        return ""
+    
+    # First, extract source types from the text if possible
+    source_types = []
+    
+    # Check for Hogan references
+    if "Hogan" in source_text or "hogan" in source_text:
+        source_types.append("Hogan Assessment")
+    
+    # Check for IDI references - distinguish between the two IDI types
+    if "IDI" in source_text or "idi" in source_text:
+        # Check for Individual Directions Inventory
+        if "directions" in source_text.lower() or "individual directions" in source_text.lower():
+            source_types.append("Individual Directions Inventory")
+        # Check for Intercultural Development Assessment
+        elif "intercultural" in source_text.lower() or "cultural" in source_text.lower():
+            source_types.append("Intercultural Development Assessment")
+        # Generic IDI if we can't determine which one
+        else:
+            source_types.append("Assessment")
+    
+    # Check for 360 references
+    if "360" in source_text:
+        source_types.append("360° Feedback")
+    
+    # Check for CV references
+    if "CV" in source_text or "cv" in source_text or "resume" in source_text.lower():
+        source_types.append("CV/Resume")
+    
+    # Replace specific patterns
+    # Replace Hogan temp files
+    source_text = re.sub(r'tmp[a-zA-Z0-9]+\.pdf\s*\(Hogan\)', 'Hogan Assessment', source_text)
+    
+    # Replace Individual Directions Inventory files
+    source_text = re.sub(r'tmp[a-zA-Z0-9]+\.pdf\s*\(IDI\)', 'Individual Directions Inventory', source_text)
+    source_text = re.sub(r'tmp[a-zA-Z0-9]+\.pdf\s*\(Individual Directions\)', 'Individual Directions Inventory', source_text)
+    
+    # Replace Intercultural Development references
+    source_text = re.sub(r'tmp[a-zA-Z0-9]+\.pdf\s*\(Intercultural\)', 'Intercultural Development Assessment', source_text)
+    
+    # Replace other temp files
+    source_text = re.sub(r'tmp[a-zA-Z0-9]+\.[a-z]+', '', source_text)
+    source_text = re.sub(r'tmp[a-zA-Z0-9]+', '', source_text)
+    
+    # Replace generic file types with more meaningful descriptions
+    source_text = re.sub(r'\bPDF\b', 'Document', source_text)
+    source_text = re.sub(r'\bDOCX\b', 'Document', source_text)
+    source_text = re.sub(r'\bDOC\b', 'Document', source_text)
+    
+    # Clean up formatting
+    source_text = re.sub(r'\s+', ' ', source_text)  # Multiple spaces
+    source_text = re.sub(r',\s*,', ',', source_text)  # Multiple commas
+    source_text = re.sub(r'\(\s*\)', '', source_text)  # Empty parentheses
+    source_text = re.sub(r',\s*$', '', source_text)  # Trailing commas
+    source_text = re.sub(r'^\s*,\s*', '', source_text)  # Leading commas
+    source_text = re.sub(r'\(\s*,', '(', source_text)  # Commas after opening parenthesis
+    source_text = re.sub(r',\s*\)', ')', source_text)  # Commas before closing parenthesis
+    
+    # Final cleanup
+    source_text = source_text.strip()
+    
+    # If we've removed everything but have identified source types, use them
+    if (not source_text or source_text == ',' or source_text == '()') and source_types:
+        return ", ".join(source_types)
+    
+    # If we still have nothing, return a generic source
+    if not source_text or source_text == ',' or source_text == '()':
+        return "Assessment Documents"
+    
+    return source_text
+
 def generate_pptx_from_json(json_data, template_path=None):
     """
     Generate a PowerPoint presentation from structured JSON data.
@@ -390,6 +464,10 @@ def generate_pptx_from_json(json_data, template_path=None):
             # Add content
             content = section['content']
             sources = section.get('sources', '')
+            
+            # Clean up sources to remove temporary filenames
+            sources = clean_source_text(sources)
+            
             content_shape = None
             for shape in slide.placeholders:
                 if shape.placeholder_format.type == 1:  # MSO_PLACEHOLDER.BODY
@@ -410,9 +488,14 @@ def generate_pptx_from_json(json_data, template_path=None):
                             p.font.color.rgb = RGBColor(10, 44, 77)
                         except:
                             pass
+                    if hasattr(p.font, 'name'):
+                        try:
+                            p.font.name = "Calibri"
+                        except:
+                            pass
                     if hasattr(p.font, 'size'):
                         try:
-                            p.font.size = 16 * 12700  # 16pt (increased from 12pt)
+                            p.font.size = 18 * 12700  # 18pt (increased from 12pt)
                         except:
                             pass
                 # Add sources as a separate paragraph if present
@@ -421,10 +504,12 @@ def generate_pptx_from_json(json_data, template_path=None):
                     p.text = f"Sources: {sources}"
                     if hasattr(p.font, 'italic'):
                         p.font.italic = True
+                    if hasattr(p.font, 'name'):
+                        p.font.name = "Calibri"
                     if hasattr(p.font, 'color') and hasattr(p.font.color, 'rgb'):
                         p.font.color.rgb = RGBColor(10, 44, 77)
                     if hasattr(p.font, 'size'):
-                        p.font.size = 16 * 12700  # 16pt (increased from 12pt)
+                        p.font.size = 18 * 12700  # 18pt (increased from 12pt)
     else:
         # Using the template - map sections to specific slides
         # Based on the template structure shown in screenshots
@@ -467,6 +552,9 @@ def generate_pptx_from_json(json_data, template_path=None):
                 
             content = section['content']
             sources = section.get('sources', '')
+            
+            # Clean up sources to remove temporary filenames
+            sources = clean_source_text(sources)
             
             # Find the slide index for this section
             slide_idx = section_map.get(section_name)
@@ -574,9 +662,14 @@ def generate_pptx_from_json(json_data, template_path=None):
                                     p.font.color.rgb = RGBColor(10, 44, 77)
                                 except:
                                     pass
+                            if hasattr(p.font, 'name'):
+                                try:
+                                    p.font.name = "Calibri"
+                                except:
+                                    pass
                             if hasattr(p.font, 'size'):
                                 try:
-                                    p.font.size = 16 * 12700  # 16pt (increased from 12pt)
+                                    p.font.size = 18 * 12700  # 18pt (increased from 12pt)
                                 except:
                                     pass
                         
@@ -586,10 +679,12 @@ def generate_pptx_from_json(json_data, template_path=None):
                             p.text = f"Sources: {sources}"
                             if hasattr(p.font, 'italic'):
                                 p.font.italic = True
+                            if hasattr(p.font, 'name'):
+                                p.font.name = "Calibri"
                             if hasattr(p.font, 'color') and hasattr(p.font.color, 'rgb'):
                                 p.font.color.rgb = RGBColor(10, 44, 77)
                             if hasattr(p.font, 'size'):
-                                p.font.size = 16 * 12700  # 16pt (increased from 12pt)
+                                p.font.size = 18 * 12700  # 18pt (increased from 12pt)
                         
                         print(f"Successfully added content to slide {slide_idx+1}")
                     except Exception as e:
@@ -669,15 +764,19 @@ def generate_pptx_from_json(json_data, template_path=None):
                     # Format content - blue text
                     if hasattr(p.font, 'color') and hasattr(p.font.color, 'rgb'):
                         p.font.color.rgb = RGBColor(10, 44, 77)
+                    if hasattr(p.font, 'name'):
+                        p.font.name = "Calibri"
                     if hasattr(p.font, 'size'):
-                        p.font.size = 16 * 12700  # 16pt (increased from 12pt)
+                        p.font.size = 18 * 12700  # 18pt (increased from 12pt)
                         
                     # Apply to all runs
                     for run in p.runs:
                         if hasattr(run.font, 'color') and hasattr(run.font.color, 'rgb'):
                             run.font.color.rgb = RGBColor(10, 44, 77)
+                        if hasattr(run.font, 'name'):
+                            run.font.name = "Calibri"
                         if hasattr(run.font, 'size'):
-                            run.font.size = 16 * 12700  # 16pt (increased from 12pt)
+                            run.font.size = 18 * 12700  # 18pt (increased from 12pt)
                     
                     # Add sources if available
                     if sources:
@@ -687,10 +786,12 @@ def generate_pptx_from_json(json_data, template_path=None):
                         # Format sources - italic
                         if hasattr(p.font, 'italic'):
                             p.font.italic = True
+                        if hasattr(p.font, 'name'):
+                            p.font.name = "Calibri"
                         if hasattr(p.font, 'color') and hasattr(p.font.color, 'rgb'):
                             p.font.color.rgb = RGBColor(10, 44, 77)
                         if hasattr(p.font, 'size'):
-                            p.font.size = 16 * 12700  # 16pt (increased from 12pt)
+                            p.font.size = 18 * 12700  # 18pt (increased from 12pt)
                 except Exception as e:
                     print(f"Error creating content on new slide: {e}")
     
@@ -748,7 +849,7 @@ def main():
         all_metadatas = []  # NEW: to collect all metadata for the report
 
 
-        with st.spinner("Processing documents..."):
+        with st.spinner("Processing documents...... This could take about a minute, please wait."):
             if subject_docs:
                 st.session_state.subject_docs = []
 
@@ -782,19 +883,18 @@ def main():
 
                 all_metadatas.extend(st.session_state.context_metadatas)
 
-        vector_store.store_documents(all_docs)  # all_docs is now a list of strings
+            vector_store.store_documents(all_docs)  # all_docs is now a list of strings
 
-        with st.spinner("Generating leadership profile... Please wait."):
-            st.session_state.profile = profile_generator.generate_profile(
-                vector_store.get_relevant_chunks(),
-                all_metadatas  # Pass the metadata list for the document summary
+            with st.spinner("Generating leadership profile...This could take a minute. Please wait."):
+                st.session_state.profile = profile_generator.generate_profile(
+                    vector_store.get_relevant_chunks(),
+                    all_metadatas  # Pass the metadata list for the document summary
+                )
 
-            )
-
-        if user_question.strip():
-            st.session_state.question_answer = profile_generator.answer_question(
-                vector_store.get_relevant_chunks(), user_question
-            )
+            if user_question.strip():
+                st.session_state.question_answer = profile_generator.answer_question(
+                    vector_store.get_relevant_chunks(), user_question
+                )
 
     if st.session_state.profile:
         # Try to parse the profile as JSON
@@ -815,38 +915,27 @@ def main():
             if not template_path.exists():
                 template_path = None
                 
-            try:
-                # Capture logs for debugging but don't display them by default
-                import io
-                import sys
-                
-                log_capture = io.StringIO()
-                original_stdout = sys.stdout
-                sys.stdout = log_capture
-                
-                pptx_io = generate_pptx_from_json(profile_json, template_path=template_path)
-                
-                # Restore stdout and get logs
-                sys.stdout = original_stdout
-                logs = log_capture.getvalue()
-                
-                # Only show logs if developer mode is enabled (hidden feature)
-                if st.session_state.get('developer_mode', False):
-                    with st.expander("PowerPoint Generation Logs"):
-                        st.code(logs)
-                
-                st.download_button(
-                    label="Download PowerPoint",
-                    data=pptx_io,
-                    file_name="leadership_report.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    key="download_pptx"
-                )
-            except Exception as e:
-                # Don't show the specific error, just a generic fallback message
-                # Fallback to generating PowerPoint without template
+            with st.spinner("Generating PowerPoint... This could take about a minute, please wait."):
                 try:
-                    pptx_io = generate_pptx_from_json(profile_json, template_path=None)
+                    # Capture logs for debugging but don't display them by default
+                    import io
+                    import sys
+                    
+                    log_capture = io.StringIO()
+                    original_stdout = sys.stdout
+                    sys.stdout = log_capture
+                    
+                    pptx_io = generate_pptx_from_json(profile_json, template_path=template_path)
+                    
+                    # Restore stdout and get logs
+                    sys.stdout = original_stdout
+                    logs = log_capture.getvalue()
+                    
+                    # Only show logs if developer mode is enabled (hidden feature)
+                    if st.session_state.get('developer_mode', False):
+                        with st.expander("PowerPoint Generation Logs"):
+                            st.code(logs)
+                    
                     st.download_button(
                         label="Download PowerPoint",
                         data=pptx_io,
@@ -854,8 +943,20 @@ def main():
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                         key="download_pptx"
                     )
-                except Exception:
-                    st.error("Could not generate PowerPoint. Please try again later.")
+                except Exception as e:
+                    # Don't show the specific error, just a generic fallback message
+                    # Fallback to generating PowerPoint without template
+                    try:
+                        pptx_io = generate_pptx_from_json(profile_json, template_path=None)
+                        st.download_button(
+                            label="Download PowerPoint",
+                            data=pptx_io,
+                            file_name="leadership_report.pptx",
+                            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            key="download_pptx"
+                        )
+                    except Exception:
+                        st.error("Could not generate PowerPoint. Please try again later.")
         except Exception as e:
             st.error(f"Could not parse profile as JSON: {e}")
             st.markdown('<div class="section-title">Executive Summary</div>', unsafe_allow_html=True)
