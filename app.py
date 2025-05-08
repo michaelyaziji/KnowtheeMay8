@@ -133,10 +133,10 @@ body {
     background: #0a2c4d;
     color: #ffc72c;
     text-align: right;
-    font-size: 3rem;
-    font-weight: 900;
-    padding: 0.7rem 2.5rem;
-    letter-spacing: 2.5px;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 0.23rem 2.5rem;
+    letter-spacing: 1.5px;
     z-index: 100;
 }
 
